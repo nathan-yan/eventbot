@@ -320,9 +320,9 @@ class BotClient(Client):
     def onMessage(self, mid, author_id, message_object, thread_id, thread_type, ts, metadata, msg, **kwargs):
         
         lower = msg['body'].lower()
-        boofs = lower.count('boof')
+        oofs = lower.count('oof')
 
-        foobs = lower.count('foob')
+        foos = lower.count('foo')
 
         if matchBeginning(msg['body'], '!barackobama'):
             time.sleep(random.uniform(0.5, 1))
@@ -367,22 +367,22 @@ class BotClient(Client):
 
             self.updateConfig()
 
-        elif msg['body'][:10] == '!boofcount':
+        elif msg['body'][:10] == '!oofcount':
             time.sleep(random.uniform(0.5, 1))
             
             self.send(
-                Message(text = "count: %s" % (self.config['boofCount'])),
+                Message(text = "count: %s" % (self.config['oofCount'])),
                 thread_id = thread_id, 
                 thread_type = thread_type
             )
 
-        elif boofs > 0 or foobs > 0:
-            self.config['boofCount'] += boofs
-            self.config['boofCount'] -= foobs
+        elif oofs > 0 or foos > 0:
+            self.config['oofCount'] += oofs
+            self.config['oofCount'] -= foos
             self.updateConfig()
             
             self.send(
-                Message(text = "count: %s" % (self.config['boofCount'])),
+                Message(text = "count: %s" % (self.config['oofCount'])),
                 thread_id = thread_id, 
                 thread_type = thread_type
             )
