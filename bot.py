@@ -5,7 +5,39 @@ import random
 import json
 import re
 
+import time 
+
+import dateparser
+import datetime
+import argparse
+import shlex
+
 regex = re.compile("[0-9]*#")   # search for events
+
+addParser = argparse.ArgumentParser()
+
+addParser.add_argument("-t", action = "store", default = "")
+addParser.add_argument("-e", action = "store", default = "", required = "True")
+addParser.add_argument("-l", action = "store", default = "")
+addParser.add_argument("-d", action = "store", default = "")
+
+
+amendParser = argparse.ArgumentParser()
+
+amendParser.add_argument("-t", action = "store", default = -1)
+amendParser.add_argument("-e", action = "store", default = -1)
+amendParser.add_argument("-l", action = "store", default = -1)
+amendParser.add_argument("-d", action = "store", default = -1)
+    
+def parse(cmd, parser):
+    lex = shlex.split(cmd)
+
+    namespace = parser.parse_args(lex)
+    return namespace
+
+def matchBeginning(cmd, match):
+    return cmd[:len(match)] == match
+
 
 class BotClient(Client):
     def __init__(self, username, password, init_path = "config.json", session_cookies = ""):
@@ -52,7 +84,7 @@ class BotClient(Client):
     def generateEventsString(self):
         res = ""
         for i, event in enumerate(self.current_events):
-            res += "%s# %s\n\n" % (i, event)
+            res += "%s. %s\n\n" % (i, self.formatEvent(event))
         
         return res 
     
@@ -128,38 +160,129 @@ class BotClient(Client):
                         thread_type = ThreadType.USER
                     )
     
+    def formatEvent(self, event):
+
+        # time, location
+        # -> : June 8th, 5PM @ Somerset
+
+        # just time
+        # -> : June 8th, 5PM
+
+        # just location 
+        # -> @ Somerset
+
+        if type(event['time']) != str:      # the time was correctly parsed
+            t = datetime.datetime.fromtimestamp(event['time'])
+            t = t.strftime("%A, %B %d %I:%M %p (%Y)")
+        else:
+            t = event['time']
+
+        res = event['event']
+        if event['time'] != "":
+            res += "\nwhen? " + t
+
+        if event['location'] != "":
+            res += "\nwhere? " + event['location']
+
+        if event['details'] != "":
+            res += "\n[%s]" % event['details']
+
+        return res
+
     @checkPermissions
     def addEvent(self, msg, author_id, thread_id, thread_type):
         content = msg['body'][12:]
+        content = content.replace('\n', ' ')
 
-        beginning_quote = content[0]
-        ending_quote = content[1:].index(beginning_quote)
-
-        if beginning_quote not in "\"\'":
+        try:
+            namespace = parse(content, addParser)
+        except:
             self.send(
-                Message(text = "please surround your event in quotations!"),
+                Message(text = "wrong syntax u naenae baby"),
                 thread_id = thread_id, 
                 thread_type = thread_type
             )
-            return
 
-        if not ending_quote:
-            content = content[1:]
-        else:
-            content = content[1: ending_quote + 1]
+            return
 
         #event_starter = regex.match(content)
         #if event_starter:
         #    content = content[event_starter.span()[1]:]
+        
+        t = namespace.t
+        e = namespace.e
+        l = namespace.l
+        d = namespace.d
 
-        content = content.replace('\n', ' ')
-
-        self.current_events.append(content)
-
+        parsed_time = dateparser.parse(t)
+        if not parsed_time:
+            parsed_time = t
+        else:
+            parsed_time = parsed_time.timestamp()
+            
+        self.current_events.append({
+            "time" : parsed_time,
+            "event" : e,
+            "location" : l,
+            "details" : d
+        })
+        
         self.updateConfig()
 
         self.send(
             Message(text = "thanks friend! I have updated the events"),
+            thread_id = thread_id, 
+            thread_type = thread_type
+        )
+
+    @checkPermissions
+    def amendEvent(self, msg, author_id, thread_id, thread_type):
+        event_number = int(msg['body'][14])
+
+        print("\n\n\n\n\n\n", event_number, msg['body' ])
+
+        content = msg['body'][16:]
+        content = content.replace('\n', ' ')
+
+        try:
+            namespace = parse(content, amendParser)
+        except:
+            self.send(
+                Message(text = "wrong syntax u naenae baby"),
+                thread_id = thread_id, 
+                thread_type = thread_type
+            )
+
+            return
+
+        #event_starter = regex.match(content)
+        #if event_starter:
+        #    content = content[event_starter.span()[1]:]
+        
+        t = namespace.t
+        e = namespace.e
+        l = namespace.l
+        d = namespace.d
+
+        parsed_time = dateparser.parse(str(t))
+        if not parsed_time:
+            parsed_time = t
+        else:
+            parsed_time = parsed_time.timestamp()
+            
+        if t != -1:
+            self.current_events[event_number]['time'] = parsed_time
+        if e != -1:
+            self.current_events[event_number]['event'] = e
+        if l != -1:
+            self.current_events[event_number]['location'] = l
+        if d != -1:
+            self.current_events[event_number]['details'] = d
+
+        self.updateConfig()
+
+        self.send(
+            Message(text = "thanks friend! I have amended the event"),
             thread_id = thread_id, 
             thread_type = thread_type
         )
@@ -195,20 +318,100 @@ class BotClient(Client):
         )
 
     def onMessage(self, mid, author_id, message_object, thread_id, thread_type, ts, metadata, msg, **kwargs):
-        if msg['body'][:12] == '!events sudo':
+        
+        lower = msg['body'].lower()
+        boofs = lower.count('boof')
+
+        foobs = lower.count('foob')
+
+        if matchBeginning(msg['body'], '!barackobama'):
+            time.sleep(random.uniform(0.5, 1))
+            oohs = ''.join(['oO'[random.randint(0, 1)] for i in range (random.randint(5, 10))]) + "hH"[random.randint(0, 1)]
+            uhhs = "uU"[random.randint(0, 1)] + ''.join(['hH'[random.randint(0, 1)] for i in range (random.randint(5, 100))]) 
+
+            self.send(
+                Message(text = oohs + " " + uhhs),
+                thread_id = thread_id, 
+                thread_type = thread_type
+            )
+
+        elif matchBeginning(msg['body'], '!whereisnathan'):
+            self.send(
+                Message(text = random.choice([
+                    "listening to nightcall in his car",
+                    "mcdonalds",
+                    "walmart",
+                    "dead", 
+                    "777-ZOINKS"
+                ])),
+                thread_id = thread_id, 
+                thread_type = thread_type
+            )
+        
+        elif matchBeginning(msg['body'], '!isthisthekrustykrab'):
+            self.config['patrickCount'] += 1
+            self.config['patrickCount'] = self.config['patrickCount'] % 4
+            
+            patrick = [
+                "no, this is patrick",
+                "no! this is patrick!",
+                "NOO! THIS IS PATRICK! [puts phone down and folds arms]",
+                "Spongebob: Uhh, patrick, that's the name of the restaurant.\nPatrick: Huh? Oh.... fishpaste!"
+            ]
+
+            self.send(
+                Message(text = patrick[self.config['patrickCount']]),
+                thread_id = thread_id, 
+                thread_type = thread_type
+            )
+
+            self.updateConfig()
+
+        elif msg['body'][:10] == '!boofcount':
+            time.sleep(random.uniform(0.5, 1))
+            
+            self.send(
+                Message(text = "count: %s" % (self.config['boofCount'])),
+                thread_id = thread_id, 
+                thread_type = thread_type
+            )
+
+        elif boofs > 0 or foobs > 0:
+            self.config['boofCount'] += boofs
+            self.config['boofCount'] -= foobs
+            self.updateConfig()
+            
+            self.send(
+                Message(text = "count: %s" % (self.config['boofCount'])),
+                thread_id = thread_id, 
+                thread_type = thread_type
+            )
+
+
+        elif msg['body'][:12] == '!events sudo':
+            time.sleep(random.uniform(0.5, 1))
             self.sudo(msg, author_id, thread_id, thread_type)
 
         elif msg['body'][:14] == '!events desudo':
+            time.sleep(random.uniform(0.5, 1))
             self.desudo(msg, author_id, thread_id, thread_type)
 
         elif msg['body'][:11] == '!events add':
+            time.sleep(random.uniform(0.5, 1))
             self.addEvent(msg, author_id, thread_id, thread_type)
 
         elif msg['body'][:11] == '!events del':
+            time.sleep(random.uniform(0.5, 1))
             self.delEvent(msg, author_id, thread_id, thread_type)
 
+        elif msg['body'][:13] == '!events amend':
+            time.sleep(random.uniform(0.5, 1))
+            self.amendEvent(msg, author_id, thread_id, thread_type)
+
         elif msg['body'] == '!events':
+            time.sleep(random.uniform(0.5, 1))
             self.showEvents(msg, author_id, thread_id, thread_type)
+
 
 email = ""
 password = ""
